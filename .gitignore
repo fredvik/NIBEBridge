@@ -1,5 +1,16 @@
+# Platformio
 .pioenvs
 .piolibdeps
+
+#VS Code files
 .vscode/.browse.c_cpp.db*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
+
+# Ignore all VS Code files (stricter than the default Platformio settings on the lines above)
+.vscode/*
+*.code-workspace
+
+# Ignore executable and lib dirs
+bin/*
+lib/*
