@@ -1,172 +1,84 @@
-/*
+ /*
  * NibeBridge - link your Nibe Fighter to your favourite home automation system
 */
 
-#include <Arduino.h>
+#include <ESP8266WiFi.h>
+//#include <Arduino.h>
+//#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 
-/*
- * State machine protocol to read data from Nibe 360P
- * v0.1 - January 2018
-**/
+#include <SoftwareSerial.h>
 
-/*
- * telegram = hela paketet från eller till RCU
- * message  = listan av C0, length, parametrar/värden - som beräknar checksum
-**/
+// Configuration
+const char* wifissid = "Eirreann";
+const char* wifipasswd = "nightcap";
 
-// Refactor till en klass?
-
-typedef void *(*StateFunc)();
-StateFunc statefunc, nextstate;
-
-char newchar;
-char messagelength;     
-
-// States must be prototype declared
-void *idle();
-void *adressbegun();
-void *adressed();
-void *getsender();
-void *getlength();
-void *getregisterhigh();
-void *getregisterlow();
-void *getvaluehigh();
-void *getvaluelow();
-void *checktelegram();
-void *endoftelegram();
-
-// Functions/states in the statemachine
-void *idle() {
-    if (newchar == 0x00) {
-        nextstate = addressbegun;
-    }
-    else {
-        // nextstate = idle;    // There may be stray bytes with MARK parity that are not addresses
-    }
-
-    return (void*) nextstate;   // Need to cast into correct function pointer type
-    // https://stackoverflow.com/questions/42951696/error-invalid-conversion-from-void-to-void-in-case-of-dlsysm
-}
-
-void *addressbegun() {
-    if (newchar == 0x14) {
-        nextstate = addressed;
-    }
-    else {
-        nextstate = idle;       // Message is not for us
-    }
-    return (void*) nextstate;
-}
-
-void *adressed() {
-    if (newchar == 0xC0) {      // Command byte(?)
-        checksum = newchar;
-        nextstate = getsender;
-    }
-    else {
-        nextstate = idle;       // Error - consider logging
-    }
-    return (void*) nextstate;
-}
-
-void *getsender() {
-    if (newchar == 0x24) {      // Sender is the NIBE controller
-        checksum ^= newchar;
-        nextstate = getlength;
-    }
-    else {
-        nextstate = idle;       // Error - unkonwn sender
-    }
-    return (void*) nextstate;
-}
-
-void *getlength() {
-    if (newchar <> 0x00) {      // Command byte(?)
-        messagelength = newchar;
-        checksum ^= newchar;
-        nextstate = getregisterhigh;
-    }
-    else {
-        nextstate = error;       // Error - consider logging
-    }
-    return (void*) nextstate;
-}
-
-void *getregisterhigh() {
-    if (newchar == 0x00) {      // First byte of register is always 0x00
-        checksum ^= newchar;
-        nextstate = getregisterlow;
-    }
-    else {
-        nextstate = error;       // Error - consider logging
-    }
-    return (void*) nextstate;
-}
-
-void *getregisterlow() {
-    paramno = newchar;
-    checksum ^= newchar;
-    if (getparamlength(paramno) == 1) {
-        nextstate = getvaluelow;
-    }
-    else {
-        nextstate = getvaluehigh;    
-    }
-    return (void*) nextstate;
-}
-
-void *getvaluehigh() {
-    // Byte manipulation from https://stackoverflow.com/questions/13900302/set-upper-and-lower-bytes-of-an-short-int-in-c
-    paramval = (paramval & 0x00FF) | (newchar << 8);    // Set the high byte of the parameter value
-    checksum ^= newchar;
-    nextstate = getvaluelow;
-}
-
-void *getvaluelow() {
-    paramval = (paramval & 0xFF00) | newchar;           // Set the low byte of the parameter value
-    checksum ^= newchar;
-    nextstate = getvaluelow;
-}
-
-void *checktelegram() {
-    if (newchar == checksum) {
-        sendack();               // Confirm to NIBE that message was not corrupt
-        nextstate = error;    
-    }
-    else {
-        sendack();               // Always send ACK to NIBE to avoid alarms
-        nextstate = error;    
-    }
-}
-
-void *endoftelegram() {
-    if (newchar == 0x03) {       // ETX received
-        nextstate = idle;
-    }
-    else {
-        nextstate = error;
-    }
-    
-}
-
-void *error() {
-}
+SoftwareSerial mySerial(10, 11);        // RX, TX
 
 
+// Other variables and constants of less importance
+int counter=0;
 
+
+// Setup code here, to run once: 
 void setup() {
-    // put your setup code here, to run once: 
+
+    // Initialize mySerial and digital pin for LED output.
+    mySerial.begin(19200);
+    Serial.begin(19200);
+
+    pinMode(LED_BUILTIN, OUTPUT);
+    counter = 0;
+
+    // Initialize WiFi - required for operation
+    // DHCP IP adress assigned: 192.168.1.250 - hostname: ESP-NIBE
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(wifissid, wifipasswd);
+    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+        Serial.println("ERROR - WiFi connection failed! Rebooting...");
+        delay(5000);
+        ESP.restart();
+    }
+
+    // Over The Air (OTA) setup
+    // ArduinoOTA.setPort(uint16_t 8266);                   // default 8266
+    // ArduinoOTA.setHostname(const char* "espnibe");       // default none
+    // ArduinoOTA.setPassword(const char* "nibepass");      // default none
+
+    ArduinoOTA.onStart([]() {
+        Serial.println("Starting OTA...");
+    });
+    ArduinoOTA.onEnd([]() {
+        Serial.println("\nEnded OTA...");
+    });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+        Serial.printf("Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) mySerial.println("Auth failed.");
+        else if (error == OTA_BEGIN_ERROR) mySerial.println("Begin failed.");
+        else if (error == OTA_CONNECT_ERROR) mySerial.println("Connect failed.");
+        else if (error == OTA_RECEIVE_ERROR) mySerial.println("Receive failed.");
+        else if (error == OTA_END_ERROR) mySerial.println("End failed.");
+    });
+    ArduinoOTA.begin();
+    Serial.println("Ready");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+    Serial.printf("Free sketch space is: [%i]", ESP.getFreeSketchSpace());
 }
 
 void loop() {
     // put your main code here, to run repeatedly:
+    ArduinoOTA.handle();
 
-    // while input is available from RS485 input, read newchar
-    // Call statemachine and use the char
-    statefunc = (StateFunc)(*statefunc)();
-
-    // if (msgreceived != '') {
-        
-
+    digitalWrite(LED_BUILTIN, HIGH);   // turn the LED off (HIGH is the voltage level)
+    delay(2000);                        // wait for halfa second
+    digitalWrite(LED_BUILTIN, LOW);    // turn the LED on by making the voltage LOW
+    delay(4000);                       // wait for two seconds
+    counter++;
+    Serial.print("Debug ");
+    Serial.println(counter, DEC);
 }
-
