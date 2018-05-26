@@ -3,25 +3,31 @@
 */
 
 #include <ESP8266WiFi.h>
-//#include <Arduino.h>
-//#include <ESP8266mDNS.h>
+//#include <Arduino.h>                  // Not needed at all(?)
+//#include <ESP8266mDNS.h>              // Not needed at this point
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-
 #include <SoftwareSerial.h>
+
+#include <RemoteDebug.h>                // Logging/debug via telnet
+
+// Consider using for simple logging:
+// https://github.com/mrRobot62/Arduino-logging-library
 
 // Configuration
 const char* wifissid = "Eirreann";
 const char* wifipasswd = "nightcap";
 
 SoftwareSerial mySerial(10, 11);        // RX, TX
-
+RemoteDebug Logger;
 
 // Other variables and constants of less importance
 int counter=0;
 
 
+// ****************************************************
 // Setup code here, to run once: 
+// ****************************************************
 void setup() {
 
     // Initialize mySerial and digital pin for LED output.
@@ -68,6 +74,18 @@ void setup() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
     Serial.printf("Free sketch space is: [%i]", ESP.getFreeSketchSpace());
+
+    // Initialize the telnet server of RemoteDebug
+    // Logger.begin("Telnet_HostName"); // Initiaze the telnet server - this name is used in MDNS.begin
+    // or
+    // Logger.begin(HOST_NAME); // Initiaze the telnet server - HOST_NAME is the used in MDNS.begin
+    // or 
+    Logger.begin("ESP-NIBE"); // Initiaze the telnet server - HOST_NAME is the used in MDNS.begin and set the initial debug level
+
+    Logger.setResetCmdEnabled(true); // Enable the reset command
+    Logger.showTime(true); // To show time
+    // Logger.showProfiler(true); // To show profiler - time between messages of Debug
+
 }
 
 void loop() {
@@ -75,10 +93,15 @@ void loop() {
     ArduinoOTA.handle();
 
     digitalWrite(LED_BUILTIN, HIGH);   // turn the LED off (HIGH is the voltage level)
-    delay(2000);                        // wait for halfa second
+    delay(200);                        // wait for halfa second
     digitalWrite(LED_BUILTIN, LOW);    // turn the LED on by making the voltage LOW
-    delay(4000);                       // wait for two seconds
+    delay(1000);                       // wait for two seconds
     counter++;
     Serial.print("Debug ");
     Serial.println(counter, DEC);
+
+    Logger.print("Debug ");
+    Logger.println(counter, DEC);
+    Logger.handle();
+    // DEBUG_V("* Time: %u seconds (VERBOSE)\n", mTimeSeconds);
 }
