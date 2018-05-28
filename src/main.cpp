@@ -4,38 +4,49 @@
 
 #include <ESP8266WiFi.h>
 //#include <Arduino.h>                  // Not needed at all(?)
-//#include <ESP8266mDNS.h>              // Not needed at this point
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <SoftwareSerial.h>
+#include <SoftwareSerial.h>             // https://github.com/addibble/SoftwareSerial9
+#include <Syslog.h>                     // https://github.com/arcao/Syslog
 
-#include <RemoteDebug.h>                // Logging/debug via telnet
+// Syslog server connection info
+#define SYSLOG_SERVER "192.168.1.5"
+#define SYSLOG_PORT 514
+#define DEVICE_HOSTNAME "NIBE-ESP"
+#define APP_NAME "NibeBridge"
+WiFiUDP udpClient;                      // A UDP instance to send and receive packets over UDP
 
-// Consider using for simple logging:
-// https://github.com/mrRobot62/Arduino-logging-library
+// Create a new syslog instance with LOG_KERN facility
+Syslog syslog(udpClient, SYSLOG_SERVER, SYSLOG_PORT, DEVICE_HOSTNAME, APP_NAME, LOG_KERN);
+int iteration = 1;
 
-// Configuration
+// WiFi Configuration
 const char* wifissid = "Eirreann";
 const char* wifipasswd = "nightcap";
 
+// Serial comm configuration
 SoftwareSerial mySerial(10, 11);        // RX, TX
-RemoteDebug Logger;
 
 // Other variables and constants of less importance
 int counter=0;
-
+unsigned long blinkinterval;
+unsigned long lastblinktime;
+int ledState = LOW;
 
 // ****************************************************
 // Setup code here, to run once: 
 // ****************************************************
 void setup() {
 
-    // Initialize mySerial and digital pin for LED output.
+    // Initialize digital pin for LED output.
+    pinMode(LED_BUILTIN, OUTPUT);
+    blinkinterval = 2000;
+    lastblinktime = millis();
+    counter = 0;
+
+    // Initialize mySerial
     mySerial.begin(19200);
     Serial.begin(19200);
-
-    pinMode(LED_BUILTIN, OUTPUT);
-    counter = 0;
 
     // Initialize WiFi - required for operation
     // DHCP IP adress assigned: 192.168.1.250 - hostname: ESP-NIBE
@@ -49,59 +60,44 @@ void setup() {
 
     // Over The Air (OTA) setup
     // ArduinoOTA.setPort(uint16_t 8266);                   // default 8266
-    // ArduinoOTA.setHostname(const char* "espnibe");       // default none
-    // ArduinoOTA.setPassword(const char* "nibepass");      // default none
+    // ArduinoOTA.setHostname(const char* "espnibe");       // default none - TODO
+    // ArduinoOTA.setPassword(const char* "nibepass");      
 
     ArduinoOTA.onStart([]() {
-        Serial.println("Starting OTA...");
+        syslog.logf(LOG_INFO, "Starting OTA...");
     });
     ArduinoOTA.onEnd([]() {
-        Serial.println("\nEnded OTA...");
+        syslog.logf(LOG_INFO, "\nEnded OTA...");
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+        // Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+        syslog.logf(LOG_INFO, "OTA progressing...");
     });
     ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) mySerial.println("Auth failed.");
-        else if (error == OTA_BEGIN_ERROR) mySerial.println("Begin failed.");
-        else if (error == OTA_CONNECT_ERROR) mySerial.println("Connect failed.");
-        else if (error == OTA_RECEIVE_ERROR) mySerial.println("Receive failed.");
-        else if (error == OTA_END_ERROR) mySerial.println("End failed.");
+        syslog.logf(LOG_ERR, "Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) syslog.logf(LOG_ERR, "Auth failed.");
+        else if (error == OTA_BEGIN_ERROR) syslog.log(LOG_ERR, "Begin failed."); 
+        else if (error == OTA_CONNECT_ERROR) syslog.log(LOG_ERR, "Connect failed.");
+        else if (error == OTA_RECEIVE_ERROR) syslog.log(LOG_ERR, "Receive failed.");
+        else if (error == OTA_END_ERROR) syslog.log(LOG_ERR, "End failed.");
     });
     ArduinoOTA.begin();
-    Serial.println("Ready");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.printf("Free sketch space is: [%i]", ESP.getFreeSketchSpace());
-
-    // Initialize the telnet server of RemoteDebug
-    // Logger.begin("Telnet_HostName"); // Initiaze the telnet server - this name is used in MDNS.begin
-    // or
-    // Logger.begin(HOST_NAME); // Initiaze the telnet server - HOST_NAME is the used in MDNS.begin
-    // or 
-    Logger.begin("ESP-NIBE"); // Initiaze the telnet server - HOST_NAME is the used in MDNS.begin and set the initial debug level
-
-    Logger.setResetCmdEnabled(true); // Enable the reset command
-    Logger.showTime(true); // To show time
-    // Logger.showProfiler(true); // To show profiler - time between messages of Debug
-
+    syslog.logf(LOG_INFO, "IP address: %s", WiFi.localIP().toString().c_str());
+    syslog.logf(LOG_DEBUG, "Free sketch space is %u", ESP.getFreeSketchSpace());
 }
 
 void loop() {
     // put your main code here, to run repeatedly:
     ArduinoOTA.handle();
 
-    digitalWrite(LED_BUILTIN, HIGH);   // turn the LED off (HIGH is the voltage level)
-    delay(200);                        // wait for halfa second
-    digitalWrite(LED_BUILTIN, LOW);    // turn the LED on by making the voltage LOW
-    delay(1000);                       // wait for two seconds
-    counter++;
-    Serial.print("Debug ");
-    Serial.println(counter, DEC);
+    unsigned long millisNow = millis();
+    if (millisNow-lastblinktime >= blinkinterval) {
+        lastblinktime = millis();
+        ledState = HIGH - ledState;             // toggle the LED
+        digitalWrite(LED_BUILTIN, ledState);   
+    }
 
-    Logger.print("Debug ");
-    Logger.println(counter, DEC);
-    Logger.handle();
-    // DEBUG_V("* Time: %u seconds (VERBOSE)\n", mTimeSeconds);
+    // syslog.logf(LOG_ERR,  "This is error message no. %d", counter);
+    // syslog.logf(LOG_INFO, "This is info message no. %d", counter);
+
 }
