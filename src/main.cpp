@@ -7,6 +7,7 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <SoftwareSerial.h>             // https://github.com/addibble/SoftwareSerial9
+//#include <AltSoftSerial.h>
 #include <Syslog.h>                     // https://github.com/arcao/Syslog
 
 // Syslog server connection info
@@ -24,8 +25,9 @@ int iteration = 1;
 const char* wifissid = "Eirreann";
 const char* wifipasswd = "nightcap";
 
-// Serial comm configuration
-SoftwareSerial mySerial(10, 11);        // RX, TX
+// Softserial configuration
+ SoftwareSerial softSerial(12, 14);        // RX, TX
+//AltSoftSerial softSerial(12, 14);        // RX, TX
 
 // Other variables and constants of less importance
 int counter=0;
@@ -45,7 +47,7 @@ void setup() {
     counter = 0;
 
     // Initialize mySerial
-    mySerial.begin(19200);
+    softSerial.begin(19200);        // Works at 115200 baud (at least when nothing else is running)
     Serial.begin(19200);
 
     // Initialize WiFi - required for operation
@@ -95,6 +97,11 @@ void loop() {
         lastblinktime = millis();
         ledState = HIGH - ledState;             // toggle the LED
         digitalWrite(LED_BUILTIN, ledState);   
+        if (counter<100) {
+            softSerial.printf("Softserial iteration %d\n", counter);
+            Serial.printf("Serial iteration %d\n", counter);
+            counter++;
+        }
     }
 
     // syslog.logf(LOG_ERR,  "This is error message no. %d", counter);
