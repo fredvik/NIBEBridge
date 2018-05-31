@@ -3,13 +3,11 @@
 */
 
 #include <ESP8266WiFi.h>
-//#include <Arduino.h>                  // Not needed at all(?)
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <SoftwareSerial.h>             // https://github.com/addibble/SoftwareSerial9
-//#include <AltSoftSerial.h>
+#include <SoftwareSerial.h>             // ESP8266-specific version by Peter Lerup
 #include <Syslog.h>                     // https://github.com/arcao/Syslog
-
+ 
 // Syslog server connection info
 #define SYSLOG_SERVER "192.168.1.5"
 #define SYSLOG_PORT 514
@@ -26,7 +24,7 @@ const char* wifissid = "Eirreann";
 const char* wifipasswd = "nightcap";
 
 // Softserial configuration
- SoftwareSerial softSerial(12, 14);        // RX, TX
+SoftwareSerial softSerial(12, 14);        // RX, Dx = D6, D5
 //AltSoftSerial softSerial(12, 14);        // RX, TX
 
 // Other variables and constants of less importance
@@ -47,7 +45,7 @@ void setup() {
     counter = 0;
 
     // Initialize mySerial
-    softSerial.begin(19200);        // Works at 115200 baud (at least when nothing else is running)
+    softSerial.begin(19200, 8, NONE, 1 );        // Works up to 115200 baud (at least when nothing else is running)
     Serial.begin(19200);
 
     // Initialize WiFi - required for operation
@@ -91,19 +89,47 @@ void setup() {
 void loop() {
     // put your main code here, to run repeatedly:
     ArduinoOTA.handle();
-
     unsigned long millisNow = millis();
+    uint8_t inchar;
+    uint8_t inpar;
+
     if (millisNow-lastblinktime >= blinkinterval) {
         lastblinktime = millis();
         ledState = HIGH - ledState;             // toggle the LED
         digitalWrite(LED_BUILTIN, ledState);   
-        if (counter<100) {
-            softSerial.printf("Softserial iteration %d\n", counter);
-            Serial.printf("Serial iteration %d\n", counter);
+        if (counter<1) {
+            //softSerial.printf("Softserial port iteration %d\n", counter);
+            //Serial.printf("Serial port iteration %d\n", counter);
+            Serial.print("Serial connection at your service\n");
             counter++;
         }
+        Serial.print("\n");
     }
 
+    if (softSerial.available()) {
+    inpar = softSerial.peekParity();
+    inchar = softSerial.read();
+
+    if ((inchar == 0x00) && (inpar))
+        Serial.printf("\n%lu ", millis());
+
+    Serial.print(inpar ? '*' : ' ');
+    Serial.printf("%02x ", inchar);
+    // Serial.printf("%1x ", softSerial.calcParity(inchar));
+
+    // Ack if the message for us
+    if ((inchar == 0x14) && (inpar)) {
+        if (softSerial.available()) {
+            Serial.printf("\n%luNo ACK: %i", millis(), softSerial.available());
+        }
+        else {
+            delay(1);  // Don't respond too quickly or the controller will sometimes miss it.
+            // TODO - delay without using delay()
+            softSerial.write(0x06, NONE);
+            Serial.printf("\n%lu ACK (%i)\n", millis(), softSerial.available());    
+        }
+    }
+}
     // syslog.logf(LOG_ERR,  "This is error message no. %d", counter);
     // syslog.logf(LOG_INFO, "This is info message no. %d", counter);
 
