@@ -7,24 +7,25 @@
  * telegram = hela paketet från eller till RCU
  * message  = listan av C0, length, parametrar/värden - som beräknar checksum
  **/
+#include <Arduino.h>
+#include <SoftwareSerial.h>
 
-#include<protocolParser.h>
 
-// Functions/states in the statemachine
-void NIBEParser::*idle() {
+/*// Functions/states in the statemachine
+void NIBEParser::idle() {
   if (newchar == 0x00) {
-    nextstate = addressbegun;
+//    setStateFunction(NIBEParser::adressbegun);
   } else {
-    // nextstate = idle;    // There may be stray bytes with MARK parity that
-    // are not addresses
+    // nextstate = idle;    // We are not at beginning of address
   }
 
-  return (void *)nextstate;
+  //return (void *)nextstate;
   // Need to cast into correct function pointer type
-  // https://stackoverflow.com/questions/42951696/error-invalid-conversion-from-void-to-void-in-case-of-dlsysm
+  //
+https://stackoverflow.com/questions/42951696/error-invalid-conversion-from-void-to-void-in-case-of-dlsysm
 }
 
-void NIBEParser::*addressbegun() {
+void NIBEParser::addressbegun() {
   if (newchar == 0x14) {
     nextstate = addressed;
   } else {
@@ -33,7 +34,7 @@ void NIBEParser::*addressbegun() {
   return (void *)nextstate;
 }
 
-void NIBEParser::*addressed() {
+void NIBEParser::addressed() {
   if (newchar == 0xC0) { // Command byte(?)
     checksum = newchar;
     nextstate = getsender;
@@ -43,7 +44,7 @@ void NIBEParser::*addressed() {
   return (void *)nextstate;
 }
 
-void NIBEParser::*getsender() {
+void NIBEParser::getsender() {
   if (newchar == 0x24) { // Sender is the NIBE controller
     checksum ^= newchar;
     nextstate = getlength;
@@ -53,7 +54,7 @@ void NIBEParser::*getsender() {
   return (void *)nextstate;
 }
 
-void NIBEParser::*getlength() {
+void NIBEParser::getlength() {
   if (newchar != 0x00) { // Command byte(?)
     messagelength = newchar;
     checksum ^= newchar;
@@ -64,7 +65,7 @@ void NIBEParser::*getlength() {
   return (void *)nextstate;
 }
 
-void NIBEParser::*getregisterhigh() {
+void NIBEParser::getregisterhigh() {
   if (newchar == 0x00) { // First byte of register is always 0x00
     checksum ^= newchar;
     nextstate = getregisterlow;
@@ -74,7 +75,7 @@ void NIBEParser::*getregisterhigh() {
   return (void *)nextstate;
 }
 
-void NIBEParser::*getregisterlow() {
+void NIBEParser::getregisterlow() {
   paramno = newchar;
   checksum ^= newchar;
   if (getparamlength(paramno) == 1) {
@@ -85,23 +86,23 @@ void NIBEParser::*getregisterlow() {
   return (void *)nextstate;
 }
 
-void NIBEParser::*getvaluehigh() {
+void NIBEParser::getvaluehigh() {
   // Byte manipulation from
-  // https://stackoverflow.com/questions/13900302/set-upper-and-lower-bytes-of-an-short-int-in-c
+  //
+https://stackoverflow.com/questions/13900302/set-upper-and-lower-bytes-of-an-short-int-in-c
   paramval = (paramval & 0x00FF) |
              (newchar << 8); // Set the high byte of the parameter value
   checksum ^= newchar;
   nextstate = getvaluelow;
 }
 
-void NIBEParser::*getvaluelow() {
+void NIBEParser::getvaluelow() {
   paramval =
-      (paramval & 0xFF00) | newchar; // Set the low byte of the parameter value
-  checksum ^= newchar;
-  nextstate = getvaluelow;
+      (paramval & 0xFF00) | newchar; // Set the low byte of the parameter
+value checksum ^= newchar; nextstate = getvaluelow;
 }
 
-void NIBEParser::*checktelegram() {
+void NIBEParser::checktelegram() {
   if (newchar == checksum) {
     sendack(); // Confirm to NIBE that message was not corrupt
     nextstate = error;
@@ -111,7 +112,7 @@ void NIBEParser::*checktelegram() {
   }
 }
 
-void NIBEParser::*endoftelegram() {
+void NIBEParser::endoftelegram() {
   if (newchar == 0x03) { // ETX received
     nextstate = idle;
   } else {
@@ -119,7 +120,8 @@ void NIBEParser::*endoftelegram() {
   }
 }
 
-void NIBEParser::*errorstate() { 
+void NIBEParser::errorstate() {
   printf("");
-  // Empty comment 
+  // Empty comment
 }
+*/

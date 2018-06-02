@@ -8,16 +8,22 @@
 #include <Syslog.h>         // https://github.com/arcao/Syslog
 #include <WiFiUdp.h>
 
+// Comm constants
+#define ETX 0x03;
+#define ENQ 0x05;
+#define ACK 0x06;
+#define NAK 0x15;
+
 // Syslog server connection info
 #define SYSLOG_SERVER "192.168.1.5"
 #define SYSLOG_PORT 514
 #define DEVICE_HOSTNAME "NIBE-ESP"
 #define APP_NAME "NibeBridge"
+
 WiFiUDP udpClient; // A UDP instance to send and receive packets over UDP
 
 // Create a new syslog instance with LOG_KERN facility
-Syslog syslog(udpClient, SYSLOG_SERVER, SYSLOG_PORT, DEVICE_HOSTNAME, APP_NAME,
-              LOG_KERN);
+Syslog syslog(udpClient, SYSLOG_SERVER, SYSLOG_PORT, DEVICE_HOSTNAME, APP_NAME, LOG_KERN);
 int iteration = 1;
 
 // WiFi Configuration
@@ -26,6 +32,92 @@ const char *wifipasswd = "nightcap";
 
 // Softserial configuration
 SoftwareSerial softSerial(12, 14); // RX, Dx = D6, D5
+
+// NIBE protocol handler
+// #include <NIBEParser.h>
+// NIBEParser nibeMachine;
+
+class NIBEConnect {
+public:
+  int connect(SoftwareSerial &connection) {
+    rs485 = connection;
+    return 0;
+  }
+  int action() {
+    // Parse data from the NIBE
+    int queue = rs485.available();
+    if (queue) {
+      inpar = rs485.peekParity();
+      inbyte = rs485.read();
+
+      switch (currentState) {
+      case ST_idle:
+        if ((inbyte == 0x00) && (inpar)) {
+          Serial.printf("\n%lu ", millis());
+          currentState = ST_addressbegun;
+        }
+        break;
+      case ST_addressbegun:
+        if ((inbyte == 0x14) && (inpar)) {
+          if (queue) {
+            Serial.printf("\n%lu No ACK, %i chars in buffer.", millis(), queue);
+          } else {
+            delay(1); // Don't respond too quickly
+            // TODO - wait slightly without using delay()
+            rs485.write(0x06, NONE);
+            Serial.printf("*%0i <-ACK ", inbyte);
+          }
+          currentState = ST_addressed;
+        }
+        break;
+      case ST_addressed:
+        break;
+      case ST_getsender:
+        break;
+      case ST_getlength:
+        break;
+      case ST_getregisterhigh:
+        break;
+      case ST_getregisterlow:
+        break;
+      case ST_getvaluehigh:
+        break;
+      case ST_getvaluelow:
+        break;
+      case ST_checktelegram:
+        break;
+      case ST_endoftelegram:
+        break;
+      case ST_error:
+        break;
+      }       // end of state machine switch
+    }         // end of rs485.available
+    return 0; // Todo - fixa return code
+  }           // end of action()
+
+private:
+  SoftwareSerial rs485;
+  uint8_t inpar, inbyte;
+
+  typedef enum {
+    ST_idle,
+    ST_addressbegun,
+    ST_addressed,
+    ST_getsender,
+    ST_getlength,
+    ST_getregisterhigh,
+    ST_getregisterlow,
+    ST_getvaluehigh,
+    ST_getvaluelow,
+    ST_checktelegram,
+    ST_endoftelegram,
+    ST_error
+  } NIBEStates;
+
+  NIBEStates currentState;
+}; // end of class declaration
+
+
 
 // Other variables and constants of less importance
 int counter = 0;
@@ -41,7 +133,6 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   blinkinterval = 2000;
   lastblinktime = millis();
-  counter = 0;
 
   // Initialize SoftSerial for comms and Serial for debug
   softSerial.begin(19200, 8, NONE, 1);
@@ -84,14 +175,16 @@ void setup() {
   ArduinoOTA.begin();
   syslog.logf(LOG_INFO, "IP address: %s", WiFi.localIP().toString().c_str());
   syslog.logf(LOG_DEBUG, "Free sketch space is %u", ESP.getFreeSketchSpace());
+
+  // Setup NIBE protocol parsing state machine
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   ArduinoOTA.handle();
   unsigned long millisNow = millis();
-  uint8_t inchar;
-  uint8_t inpar;
+  /*uint8_t inchar;
+  uint8_t inpar;*/
 
   if (millisNow - lastblinktime >= blinkinterval) {
     lastblinktime = millis();
@@ -103,22 +196,9 @@ void loop() {
       Serial.print("Serial connection at your service\n");
       counter++;
     }
-    Serial.print("\n");
-  }
-
-  if (softSerial.available()) {
-    inpar = softSerial.peekParity();
-    inchar = softSerial.read();
-
-    if ((inchar == 0x00) && (inpar))
-      Serial.printf("\n%lu ", millis());
-
-    Serial.print(inpar ? '*' : ' ');
-    Serial.printf("%02x ", inchar);
-    // Serial.printf("%1x ", softSerial.calcParity(inchar));
 
     // Ack if the message for us
-    if ((inchar == 0x14) && (inpar)) {
+    /*if ((inchar == 0x14) && (inpar)) {
       if (softSerial.available()) {
         Serial.printf("\n%luNo ACK: %i", millis(), softSerial.available());
       } else {
@@ -127,7 +207,7 @@ void loop() {
         softSerial.write(0x06, NONE);
         Serial.printf("\n%lu ACK (%i)\n", millis(), softSerial.available());
       }
-    }
+    }*/
   }
   // syslog.logf(LOG_ERR,  "This is error message no. %d", counter);
   // syslog.logf(LOG_INFO, "This is info message no. %d", counter);

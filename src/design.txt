@@ -1,0 +1,12 @@
+
+
+class NIBEConnect(modSoftSerial &rs485, NIBEModel model)
+  State machine som läser/skriver till NIBE av given modell
+  .getParameter
+
+class MQTTConnect
+  Läs/skriv till MQTT
+
+Struct NIBEParameter
+
+
