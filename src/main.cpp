@@ -7,6 +7,7 @@
 #include <SoftwareSerial.h> // ESP8266-specific version by Peter Lerup
 #include <Syslog.h>         // https://github.com/arcao/Syslog
 #include <WiFiUdp.h>
+#include <NIBEConnect.h>
 
 // Comm constants
 #define ETX 0x03;
@@ -33,89 +34,9 @@ const char *wifipasswd = "nightcap";
 // Softserial configuration
 SoftwareSerial softSerial(12, 14); // RX, Dx = D6, D5
 
-// NIBE protocol handler
-// #include <NIBEParser.h>
-// NIBEParser nibeMachine;
+// NIBEConnect configuration
+NIBEConnect nibe(softSerial);
 
-class NIBEConnect {
-public:
-  int connect(SoftwareSerial &connection) {
-    rs485 = connection;
-    return 0;
-  }
-  int action() {
-    // Parse data from the NIBE
-    int queue = rs485.available();
-    if (queue) {
-      inpar = rs485.peekParity();
-      inbyte = rs485.read();
-
-      switch (currentState) {
-      case ST_idle:
-        if ((inbyte == 0x00) && (inpar)) {
-          Serial.printf("\n%lu ", millis());
-          currentState = ST_addressbegun;
-        }
-        break;
-      case ST_addressbegun:
-        if ((inbyte == 0x14) && (inpar)) {
-          if (queue) {
-            Serial.printf("\n%lu No ACK, %i chars in buffer.", millis(), queue);
-          } else {
-            delay(1); // Don't respond too quickly
-            // TODO - wait slightly without using delay()
-            rs485.write(0x06, NONE);
-            Serial.printf("*%0i <-ACK ", inbyte);
-          }
-          currentState = ST_addressed;
-        }
-        break;
-      case ST_addressed:
-        break;
-      case ST_getsender:
-        break;
-      case ST_getlength:
-        break;
-      case ST_getregisterhigh:
-        break;
-      case ST_getregisterlow:
-        break;
-      case ST_getvaluehigh:
-        break;
-      case ST_getvaluelow:
-        break;
-      case ST_checktelegram:
-        break;
-      case ST_endoftelegram:
-        break;
-      case ST_error:
-        break;
-      }       // end of state machine switch
-    }         // end of rs485.available
-    return 0; // Todo - fixa return code
-  }           // end of action()
-
-private:
-  SoftwareSerial rs485;
-  uint8_t inpar, inbyte;
-
-  typedef enum {
-    ST_idle,
-    ST_addressbegun,
-    ST_addressed,
-    ST_getsender,
-    ST_getlength,
-    ST_getregisterhigh,
-    ST_getregisterlow,
-    ST_getvaluehigh,
-    ST_getvaluelow,
-    ST_checktelegram,
-    ST_endoftelegram,
-    ST_error
-  } NIBEStates;
-
-  NIBEStates currentState;
-}; // end of class declaration
 
 
 
@@ -209,6 +130,7 @@ void loop() {
       }
     }*/
   }
+  nibe.action();
   // syslog.logf(LOG_ERR,  "This is error message no. %d", counter);
   // syslog.logf(LOG_INFO, "This is info message no. %d", counter);
 }
