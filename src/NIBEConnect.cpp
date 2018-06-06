@@ -31,35 +31,29 @@ int NIBEConnect::action() {
     case ST_idle:
       if ((inbyte == 0x00) && (inpar)) {
         Serial.printf("\n%lu ", millis());
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X ", inbyte);
         currentState = ST_addressbegun;
-      } else {
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X_", inbyte);
       }
+      Serial.print(inpar ? '*' : ' ');
+      Serial.printf("%02X ", inbyte);
       break;
 
     case ST_addressbegun:
       if ((inbyte == 0x14) && (inpar)) {
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X ", inbyte);
-        if (rs485.available()) { // Only respond if at end of buffer
-          Serial.printf("\n%lu No ACK, %i chars in buffer.\n", millis(),
-                        rs485.available());
-          currentState = ST_idle;
-        } else {
-          // rs485 queue is empty - we are in time to respond
-          delay(1); // Don't respond too quickly
+        if (rs485.available() == 0) { // Only respond if at end of buffer
+          // rs485 queue is empty, don't respond too quickly
+          delay(1);
           // TODO - wait slightly without using delay()
           rs485.write(0x06, NONE);
-          Serial.printf("ACK ");
+          Serial.print(inpar ? '*' : ' ');
+          Serial.printf("%02X", inbyte);
+          Serial.printf(" <ACK>");
         }
         currentState = ST_addressed;
       } else {
-        // inbyte != 0x14
-        // Serial.print(inpar ? '*' : ' ');
-        // Serial.printf("%02X ", inbyte);
+        // if (inbyte != 0x14) or (no parity) go back to Idle
+        Serial.print(inpar ? '*' : ' ');
+        Serial.printf("%02X", inbyte);
+        Serial.printf(" (not for us)");
         currentState = ST_idle;
       }
       break;
@@ -69,38 +63,35 @@ int NIBEConnect::action() {
         // Command byte received
         chksum = inbyte;
         currentState = ST_commandreceived;
+      } else {
         Serial.print(inpar ? '*' : ' ');
         Serial.printf("%02X ", inbyte);
-      } else {
+        Serial.printf(". Expected C0\n");
         currentState = ST_idle; // TODO - Is this an error? Consider logging
-        Serial.printf("No command byte (C0) received.\n");
       }
       break;
 
     case ST_commandreceived:
       if ((inbyte == 0x00) && (inpar == 0)) {
-        // Command byte received
         chksum ^= inbyte;
         currentState = ST_getsender;
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X ", inbyte);
       } else {
-        currentState = ST_idle; // TODO - Is this an error? Consider logging
         Serial.printf("00 expected, %02X recieved\n", inbyte);
+        currentState = ST_idle; // TODO - Is this an error? Consider logging
       }
+      Serial.print(inpar ? '*' : ' ');
+      Serial.printf("%02X ", inbyte);
       break;
 
     case ST_getsender:
       if ((inbyte == 0x24)) {
         chksum ^= inbyte;
         currentState = ST_getlength;
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X ", inbyte);
       } else {
         currentState = ST_idle; // TODO - Is this an error? Consider logging
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X ", inbyte);
       }
+      Serial.print(inpar ? '*' : ' ');
+      Serial.printf("%02X ", inbyte);
       break;
 
     case ST_getlength:
@@ -110,7 +101,7 @@ int NIBEConnect::action() {
         numbytes = 0;
         currentState = ST_getregisterhigh;
         Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X (l=%i)\n", inbyte, inbyte);
+        Serial.printf("%02X \n", inbyte);
       } else {
         currentState = ST_idle; // TODO - Is this an error? Consider logging
         Serial.print(inpar ? '*' : ' ');
@@ -124,13 +115,12 @@ int NIBEConnect::action() {
         numbytes++;
         paramno = inbyte;
         paramno = paramno << 8;
-
         if (numbytes < msglen) {
-          currentState = ST_getregisterlow;
           Serial.print(inpar ? '*' : ' ');
           Serial.printf("%02X ", inbyte);
+          currentState = ST_getregisterlow;
         } else {
-          // found a single byte of scrap at end of telegram
+          // a single byte of scrap at end of telegram
           Serial.print(inpar ? '*' : ' ');
           Serial.printf("%02X scrapped\n", inbyte);
           currentState = ST_checktelegram;
@@ -145,19 +135,16 @@ int NIBEConnect::action() {
       numbytes++;
       paramno += inbyte;
       paramval = 0;
-      // TODO - read 1-byte parameters from a list to make the function model
-      // independent
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
-
       paramlen = getParamLen(paramno);
       if (paramlen == 1) {
         currentState = ST_getvaluelow;
       } else {
         currentState = ST_getvaluehigh;
       }
+      Serial.print(inpar ? '*' : ' ');
+      Serial.printf("%02X ", inbyte);
       if (numbytes == msglen) {
-        Serial.print("\End of message\n");
+        Serial.print("\n Message end in ST_getregisterlow\n");
         currentState = ST_checktelegram;
       }
       // } end of if((inpar==0)
@@ -184,7 +171,8 @@ int NIBEConnect::action() {
       }
       Serial.print(inpar ? '*' : ' ');
       Serial.printf("%02X ", inbyte);
-      if (paramlen == 1) Serial.print("    "); // padding
+      if (paramlen == 1)
+        Serial.print("    "); // padding
       Serial.printf("    Param %i is %i at pos %i, length %i\n", paramno,
                     paramval, numbytes, paramlen);
       break;
@@ -204,51 +192,11 @@ int NIBEConnect::action() {
       Serial.print("\n");
       currentState = ST_idle;
       break;
+
     case ST_error:
+      Serial.print("Error: bla blah bla.\n");
       break;
     } // end of state machine switch
   }
   return 0; // Todo - fixa return code
 } // end of action()
-
-/*// Functions/states in the statemachine
-
-void NIBEParser::getvaluehigh() {
-  // Byte manipulation from
-  //
-https://stackoverflow.com/questions/13900302/set-upper-and-lower-bytes-of-an-short-int-in-c
-  paramval = (paramval & 0x00FF) |
-             (newchar << 8); // Set the high byte of the parameter value
-  checksum ^= newchar;
-  nextstate = getvaluelow;
-}
-
-void NIBEParser::getvaluelow() {
-  paramval =
-      (paramval & 0xFF00) | newchar; // Set the low byte of the parameter
-value checksum ^= newchar; nextstate = getvaluelow;
-}
-
-void NIBEParser::checktelegram() {
-  if (newchar == checksum) {
-    sendack(); // Confirm to NIBE that message was not corrupt
-    nextstate = error;
-  } else {
-    sendack(); // Always send ACK to NIBE to avoid alarms
-    nextstate = error;
-  }
-}
-
-void NIBEParser::endoftelegram() {
-  if (newchar == 0x03) { // ETX received
-    nextstate = idle;
-  } else {
-    nextstate = error;
-  }
-}
-
-void NIBEParser::errorstate() {
-  printf("");
-  // Empty comment
-}
-*/

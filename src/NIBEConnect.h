@@ -22,7 +22,7 @@ class NIBEConnect {
 public:
   SoftwareSerial &rs485;
   NIBEConnect(SoftwareSerial &connection) : rs485(connection) {}
-  // virtual ~NIBEConnect(); // Is the destructor needed or useful?
+  // Is the destructor needed or useful?
   int connect();
   int action();
 
@@ -47,6 +47,7 @@ private:
 
   uint8_t inbyte, inpar, chksum, msglen, numbytes, paramlen;
   int16_t paramno, paramval;
+  uint8_t rtelegram[32]; // received telegran
 };
 
 #endif
