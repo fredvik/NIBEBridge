@@ -9,4 +9,10 @@ class MQTTConnect
 
 Struct NIBEParameter
 
+Med char[]
+DATA:    [====      ]  44.1% (used 36128 bytes from 81920 bytes)
+PROGRAM: [=         ]   6.9% (used 289376 bytes from 4194304 bytes)
 
+Med String:
+DATA:    [====      ]  44.1% (used 36096 bytes from 81920 bytes)
+PROGRAM: [=         ]   6.9% (used 289520 bytes from 4194304 bytes)

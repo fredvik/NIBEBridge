@@ -6,74 +6,65 @@
  * fredrik@viklund.se
  */
 
-#include <NIBERegisters.h>
 #include <HardwareSerial.h>
+#include <NIBERegisters.h>
+#include <string>
 
-//int NIBERegisters::getParamLen(int paramno) {
-int getParamLen(int paramno) {
-  /*
-  if ((paramno == 20) || (paramno == 27)) {
-    return 1;  // single-byte registers
-  }
-  else {
+// int NIBERegisters::getParamLen(int paramno) {
+int NIBERegisters::getParamLen(int paramno) {
+  if (params360p[paramno].flags & INT) {
     return 2;
-  } */
-
-  switch (paramno) {
-  case 0x01:
-  case 0x02:
-  case 0x03:
-  case 0x04:
-  case 0x05:
-  case 0x06:
-  case 0x07:
-  case 0x08:
-  case 0x09:
-  case 0x0a:
-  case 0x0e:
-  case 0x0f:
-  case 0x14:
-  case 0x15:
-  case 0x16:
-  case 0x17:
-  case 0x18:
-  case 0x19:
-  case 0x1b:
-  case 0x1c:
-  case 0x1d:
-  case 0x25:
-    return 2;
-    break;
-  case 0x00:
-  case 0x0b:
-  case 0x0c:
-  case 0x0d:
-  case 0x10:
-  case 0x11:
-  case 0x12:
-  case 0x13:
-  case 0x1a:
-  case 0x1e:
-  case 0x1f:
-  case 0x20:
-  case 0x21:
-  case 0x22:
-  case 0x23:
-  case 0x24:
-  case 0x26:
-  case 0x27:
-  case 0x28:
-  case 0x29:
-  case 0x2a:
-  case 0x2b:
-  case 0x2c:
-  case 0x2d:
-  case 0x2e:
-  case 0x2f:
+  } else {
     return 1;
-    break;
-  default:
-    Serial.printf("Unknown cmd length for %i\n", paramno);
-    return 2;
   }
+}
+
+int NIBERegisters::getParamType(int paramno) {
+  uint8_t flag = params360p[paramno].flags;
+  if ((flag & SIGNED) && (flag & BYTE)) {
+    return SBYTE;
+  }
+    if ((flag & UNSIGNED) && (flag & BYTE)) {
+    return UBYTE;
+  }
+  if ((flag & SIGNED) && (flag & INT)) {
+    return SINT;
+  }
+  if ((flag & SIGNED) && (flag & INT)) {
+    return UINT;
+  }
+  return 0;  // TODO - add meaning to return value
+}
+
+float NIBERegisters::getParamFactor(int paramno) {
+  real32_t fact = params360p[paramno].factor;
+  if (fact < 0) {
+    return (1 / -fact);
+  } else {
+    return fact;
+  }
+}
+
+int NIBERegisters::storeTg(Telegram tg) {
+  int count = 1;
+  msglen = tg[0];
+  // Serial.printf("msglen = %d\n", msglen);
+  // Serial.printf("String length: %i\n", tgstr.length());
+  while (count < msglen - 3) {
+    // May be scrap at the end, must be >2 chars left to be meaningful
+    paramno = ((int16_t)tg[count]) << 8 | (int16_t)tg[count+1];
+    // Serial.printf("%02X %02X ", tgstr.charAt(count), tgstr.charAt(count+1));
+    count += 2;
+    paramlen = getParamLen(paramno);
+    paramtype = getParamType(paramno);
+    if (paramlen == 1) {
+      paramval = ((int16_t)tg[count]);
+      count++;
+    } else {
+      paramval = ((int16_t)tg[count]) << 8 | (int16_t)tg[count+1];
+      count += 2;
+    }
+    // Serial.printf("Param %0d is %d, factor %f\n", paramno, (uint16_t)paramval, getParamFactor(paramno));
+  }
+  return 0;  // TODO - add meaning to return value
 }

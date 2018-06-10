@@ -4,9 +4,9 @@
 
 #include <ArduinoOTA.h>
 #include <ESP8266WiFi.h>
-#include <SoftwareSerial.h> // ESP8266-specific version by Peter Lerup
 #include <Syslog.h>         // https://github.com/arcao/Syslog
 #include <WiFiUdp.h>
+#include <SoftwareSerial.h> // ESP8266-specific version by Peter Lerup, modified
 #include <NIBEConnect.h>
 
 // Comm constants

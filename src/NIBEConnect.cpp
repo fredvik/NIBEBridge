@@ -12,13 +12,15 @@
  **/
 
 #include <NIBEConnect.h>
-#include <NIBERegisters.h>
-#include <SoftwareSerial.h>
+// #include <NIBERegisters.h>   - should be included via NIBEConnect.h
+// #include <SoftwareSerial.h>
+// #include <paraminfo.h>
 
 int NIBEConnect::connect() {
   //  rs485 = connection;
   return 0;
 }
+
 int NIBEConnect::action() {
   // Parse data from the NIBE
   int queue = rs485.available();
@@ -29,12 +31,14 @@ int NIBEConnect::action() {
 
     switch (currentState) {
     case ST_idle:
+      // TODO - remove the line below
+      rxstr = "";
       if ((inbyte == 0x00) && (inpar)) {
-        Serial.printf("\n%lu ", millis());
+        //        Serial.printf("\n%lu ", millis());
         currentState = ST_addressbegun;
       }
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
+      //      Serial.print(inpar ? '*' : ' ');
+      //      Serial.printf("%02X ", inbyte);
       break;
 
     case ST_addressbegun:
@@ -44,16 +48,16 @@ int NIBEConnect::action() {
           delay(1);
           // TODO - wait slightly without using delay()
           rs485.write(0x06, NONE);
-          Serial.print(inpar ? '*' : ' ');
-          Serial.printf("%02X", inbyte);
-          Serial.printf(" <ACK>");
+          //          Serial.print(inpar ? '*' : ' ');
+          //          Serial.printf("%02X", inbyte);
+          //          Serial.printf(" <ACK>");
         }
         currentState = ST_addressed;
       } else {
         // if (inbyte != 0x14) or (no parity) go back to Idle
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X", inbyte);
-        Serial.printf(" (not for us)");
+        /*        Serial.print(inpar ? '*' : ' ');
+                Serial.printf("%02X", inbyte);
+                Serial.printf(" (not for us)");*/
         currentState = ST_idle;
       }
       break;
@@ -64,9 +68,10 @@ int NIBEConnect::action() {
         chksum = inbyte;
         currentState = ST_commandreceived;
       } else {
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X ", inbyte);
-        Serial.printf(". Expected C0\n");
+        /*        Serial.print(inpar ? '*' : ' ');
+                Serial.printf("%02X ", inbyte);
+                Serial.printf(". Expected C0\n");
+        */
         currentState = ST_idle; // TODO - Is this an error? Consider logging
       }
       break;
@@ -79,8 +84,9 @@ int NIBEConnect::action() {
         Serial.printf("00 expected, %02X recieved\n", inbyte);
         currentState = ST_idle; // TODO - Is this an error? Consider logging
       }
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
+      /*      Serial.print(inpar ? '*' : ' ');
+            Serial.printf("%02X ", inbyte);
+            */
       break;
 
     case ST_getsender:
@@ -90,18 +96,23 @@ int NIBEConnect::action() {
       } else {
         currentState = ST_idle; // TODO - Is this an error? Consider logging
       }
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
+      //      Serial.print(inpar ? '*' : ' ');
+      //      Serial.printf("%02X ", inbyte);
       break;
 
     case ST_getlength:
       if ((inbyte != 0x00) && (inpar == 0)) {
         msglen = inbyte;
         chksum ^= inbyte;
-        numbytes = 0;
-        currentState = ST_getregisterhigh;
-        Serial.print(inpar ? '*' : ' ');
-        Serial.printf("%02X \n", inbyte);
+        bytecount = 0;
+        rxtg[0] = inbyte;  // length of telegram stored in first byte
+        //        rxstr.concat((unsigned char)inbyte);
+        bytecount++;
+        rxstr = "";
+        //        Serial.print(inpar ? '*' : ' ');
+        //        Serial.printf("%02X \n", inbyte);
+        //        Serial.printf("(l = %d) ", msglen);
+        currentState = ST_gettelegram;
       } else {
         currentState = ST_idle; // TODO - Is this an error? Consider logging
         Serial.print(inpar ? '*' : ' ');
@@ -109,83 +120,33 @@ int NIBEConnect::action() {
       }
       break;
 
-    case ST_getregisterhigh:
-      if ((inpar == 0)) {
-        chksum ^= inbyte;
-        numbytes++;
-        paramno = inbyte;
-        paramno = paramno << 8;
-        if (numbytes < msglen) {
-          Serial.print(inpar ? '*' : ' ');
-          Serial.printf("%02X ", inbyte);
-          currentState = ST_getregisterlow;
-        } else {
-          // a single byte of scrap at end of telegram
-          Serial.print(inpar ? '*' : ' ');
-          Serial.printf("%02X scrapped\n", inbyte);
-          currentState = ST_checktelegram;
-          break;
-        }
-      }
-      break;
-
-    case ST_getregisterlow:
-      // if ((inpar == 0)) {
+    case ST_gettelegram:
       chksum ^= inbyte;
-      numbytes++;
-      paramno += inbyte;
-      paramval = 0;
-      paramlen = getParamLen(paramno);
-      if (paramlen == 1) {
-        currentState = ST_getvaluelow;
-      } else {
-        currentState = ST_getvaluehigh;
-      }
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
-      if (numbytes == msglen) {
-        Serial.print("\n Message end in ST_getregisterlow\n");
+      // TODO - use only String, not array - and just one of them:
+      rxtg[bytecount] = inbyte;
+      //          rxstr.concat((unsigned char)inbyte);
+      // Serial.print(inpar ? '*' : ' ');
+      // Serial.printf("%02X ", inbyte);
+      bytecount++;
+      if (bytecount > msglen) {
         currentState = ST_checktelegram;
       }
-      // } end of if((inpar==0)
-      break;
-
-    case ST_getvaluehigh:
-      chksum ^= inbyte;
-      numbytes++;
-      paramval = inbyte;
-      paramval = paramval << 8;
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
-      currentState = ST_getvaluelow;
-      break;
-
-    case ST_getvaluelow:
-      chksum ^= inbyte;
-      numbytes++;
-      paramval += inbyte;
-      if (numbytes >= msglen) {
-        currentState = ST_checktelegram;
-      } else {
-        currentState = ST_getregisterhigh;
-      }
-      Serial.print(inpar ? '*' : ' ');
-      Serial.printf("%02X ", inbyte);
-      if (paramlen == 1)
-        Serial.print("    "); // padding
-      Serial.printf("    Param %i is %i at pos %i, length %i\n", paramno,
-                    paramval, numbytes, paramlen);
       break;
 
     case ST_checktelegram:
       if (inbyte == chksum) {
         rs485.write(0x06, NONE);
-        Serial.printf("Checksum %02X OK, ACK sent\n", chksum);
+        //Serial.printf("Checksum %02X OK, ACK sent\n", chksum);
+        // Serial.printf("\nTelegram is: ");
+        /* for (int i = 0; i < rxstr.length(); i++) {
+          Serial.printf("%02X ", rxstr[i]);
+        }*/
+        myHeatpump.storeTg(rxtg);
       } else {
         rs485.write(0x15, NONE);
         Serial.printf("Checksum error! (%02X), NAK sent\n", chksum);
       }
-      currentState = ST_endoftelegram;
+      currentState = ST_idle;
       break;
 
     case ST_endoftelegram:

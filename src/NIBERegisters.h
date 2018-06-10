@@ -12,29 +12,29 @@
 #include <stdint.h>
 #include <string.h>
 
-int getParamLen(int paramno);
+#include <Paraminfo.inc>
 
 class NIBERegisters {
 private:
-  typedef enum VarType {
-    SIGNEDINT,
-    UNSIGNEDINT,
-    BIT,
-    BITFIELD
-  };
+  typedef char Telegram[30];
+  typedef enum VarType { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
   struct NIBEregister {
     uint8_t modbusNr;
-//    String nameSV;
-    bool   writeable;
-    VarType type;
+    bool writeable;
     uint16_t bitmask;
-    // TODO - resolution, factor, min, max - store efficiently as sparse array?
-  } NIBEreg[65];      // TODO - fix dynamic allocation for different models
+    //    String nameSV;
+    // TODO - resolution, factor, min, max - store efficiently?
+  } NIBEreg[65]; // TODO - fix dynamic allocation for different models
+  int16_t paramno, paramval, paramtype;
+  uint8_t msglen, paramlen;
 
 public:
+  int storeTg(Telegram tg);
   int setRegister();
   int getRegister();
   int getParamLen(int paramno);
+  float getParamFactor(int paramno);
+  int getParamType(int paramno);
   // registernummer i NIBEs lista startar på 1 men adresseras med start på 0,
   // dvs för register 1 skickar man adress 0 på modbus
   // Parameter 4 = frånluftstemperatur = modbus reg nr 5
