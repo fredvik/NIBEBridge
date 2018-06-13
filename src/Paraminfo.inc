@@ -9,13 +9,15 @@
 #ifndef Paraminfo_h
 #define Paraminfo_h
 
+
 typedef struct {
     uint16_t bitmask;
     /*int16_t resolution; always
     int16_t minlimit;
     int16_t maxlimit;*/
     uint8_t  flags;
-    int8_t   factor; 
+    int8_t   factor;
+    VarType type;
 } ParamInfo;
 
 #define BYTE     (uint8_t)0x00  // Parameter variable types

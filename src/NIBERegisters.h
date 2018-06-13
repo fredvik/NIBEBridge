@@ -10,7 +10,9 @@
 #define NIBERegisters_h
 
 #include <stdint.h>
-#include <string.h>
+
+typedef enum VarType { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
+// TODO - clean up VarType that is defined twice - here and in the class
 
 #include <Paraminfo.inc>
 
@@ -29,15 +31,16 @@ private:
   uint8_t msglen, paramlen;
 
 public:
+  // registernummer i NIBEs lista startar på 1 men adresseras med start på 0,
+  // dvs för register 1 skickar man adress 0 på modbus
+  // Parameter 4 = frånluftstemperatur = modbus reg nr 5
   int storeTg(Telegram tg);
   int setRegister();
   int getRegister();
   int getParamLen(int paramno);
   float getParamFactor(int paramno);
-  int getParamType(int paramno);
-  // registernummer i NIBEs lista startar på 1 men adresseras med start på 0,
-  // dvs för register 1 skickar man adress 0 på modbus
-  // Parameter 4 = frånluftstemperatur = modbus reg nr 5
+  VarType getParamType(int paramno);
+
 };
 
 #endif

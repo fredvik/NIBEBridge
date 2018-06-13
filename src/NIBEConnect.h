@@ -49,7 +49,7 @@ private:
   uint8_t inbyte, inpar, chksum, msglen, bytecount, paramlen;
   int16_t paramno, paramval, paramtype;
 
-  typedef char Telegram[30];
+  typedef char Telegram[30];  // TODO fix char type to uint8_t
   Telegram rxtg, txtg; // telegrams received and for transmission
   String rxstr;
 };

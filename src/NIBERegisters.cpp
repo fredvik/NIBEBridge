@@ -8,32 +8,34 @@
 
 #include <HardwareSerial.h>
 #include <NIBERegisters.h>
-#include <string>
 
 // int NIBERegisters::getParamLen(int paramno) {
 int NIBERegisters::getParamLen(int paramno) {
-  if (params360p[paramno].flags & INT) {
-    return 2;
-  } else {
+  if (params360p[paramno].flags & BYTE) {
     return 1;
+  } else {
+    return 2;
   }
 }
 
-int NIBERegisters::getParamType(int paramno) {
+NIBERegisters::VarType NIBERegisters::getParamType(int paramno) {
   uint8_t flag = params360p[paramno].flags;
-  if ((flag & SIGNED) && (flag & BYTE)) {
-    return SBYTE;
+  if (flag & SIGNED) {
+    if (flag & INT) {
+      return SINT;
+    } else {
+      return SBYTE;
+    }
+  } else {
+    if (flag & INT) {
+      return UINT;
+    } else {
+      return UBYTE;
+    }
   }
-    if ((flag & UNSIGNED) && (flag & BYTE)) {
-    return UBYTE;
-  }
-  if ((flag & SIGNED) && (flag & INT)) {
-    return SINT;
-  }
-  if ((flag & SIGNED) && (flag & INT)) {
-    return UINT;
-  }
-  return 0;  // TODO - add meaning to return value
+  Serial.printf("\nFailed type determination of param no %d with flag %02X.\n",
+                paramno, flag);
+  return UINT; // Safe
 }
 
 float NIBERegisters::getParamFactor(int paramno) {
@@ -47,24 +49,42 @@ float NIBERegisters::getParamFactor(int paramno) {
 
 int NIBERegisters::storeTg(Telegram tg) {
   int count = 1;
+  float temp;
   msglen = tg[0];
   // Serial.printf("msglen = %d\n", msglen);
   // Serial.printf("String length: %i\n", tgstr.length());
   while (count < msglen - 3) {
     // May be scrap at the end, must be >2 chars left to be meaningful
-    paramno = ((int16_t)tg[count]) << 8 | (int16_t)tg[count+1];
-    // Serial.printf("%02X %02X ", tgstr.charAt(count), tgstr.charAt(count+1));
+    paramno = ((int16_t)tg[count]) << 8 | (int16_t)tg[count + 1];
     count += 2;
     paramlen = getParamLen(paramno);
     paramtype = getParamType(paramno);
-    if (paramlen == 1) {
-      paramval = ((int16_t)tg[count]);
+    Serial.printf("\nParam %d (%02X), type %d, length %d ", paramno, paramno, paramtype, paramlen);
+    switch (paramtype) {
+    case SBYTE:
+      temp = (float)((int8_t)tg[count]) * getParamFactor(paramno);
+      Serial.printf("SBYTE = %.1f", temp);
       count++;
-    } else {
-      paramval = ((int16_t)tg[count]) << 8 | (int16_t)tg[count+1];
+      break;
+
+    case UBYTE:
+      temp = (float)tg[count] * getParamFactor(paramno);
+      Serial.printf("UBYTE = %.1f", temp);
+      count++;
+      break;
+
+    case SINT:
+      temp = (float)(((int16_t)(int8_t)tg[count]) << 8 | (int8_t)tg[count + 1]) * getParamFactor(paramno);
+      Serial.printf("SINT  = %.1f", temp);
       count += 2;
+      break;
+
+    case UINT:
+      temp = (float)((uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1]) * getParamFactor(paramno);
+      Serial.printf("UINT  = %.1f", temp);
+      count += 2;
+      break;
     }
-    // Serial.printf("Param %0d is %d, factor %f\n", paramno, (uint16_t)paramval, getParamFactor(paramno));
   }
-  return 0;  // TODO - add meaning to return value
+  return 0; // TODO - add meaning to return value
 }
