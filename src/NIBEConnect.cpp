@@ -137,10 +137,6 @@ int NIBEConnect::action() {
       if (inbyte == chksum) {
         rs485.write(0x06, NONE);
         //Serial.printf("Checksum %02X OK, ACK sent\n", chksum);
-        // Serial.printf("\nTelegram is: ");
-        /* for (int i = 0; i < rxstr.length(); i++) {
-          Serial.printf("%02X ", rxstr[i]);
-        }*/
         myHeatpump.storeTg(rxtg);
       } else {
         rs485.write(0x15, NONE);

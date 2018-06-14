@@ -19,15 +19,14 @@ typedef enum VarType { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
 class NIBERegisters {
 private:
   typedef char Telegram[30];
-  typedef enum VarType { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
-  struct NIBEregister {
-    uint8_t modbusNr;
-    bool writeable;
-    uint16_t bitmask;
-    //    String nameSV;
-    // TODO - resolution, factor, min, max - store efficiently?
-  } NIBEreg[65]; // TODO - fix dynamic allocation for different models
-  int16_t paramno, paramval, paramtype;
+  typedef enum { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
+  struct stored {
+    float   value;
+    unsigned long lastWrite;    
+  } stored[65]; // TODO - fix dynamic allocation for different models
+  
+  int16_t paramno, paramtype;
+  float paramval;
   uint8_t msglen, paramlen;
 
 public:

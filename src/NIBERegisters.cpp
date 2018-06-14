@@ -5,7 +5,7 @@
  * Copyright (C) 2018 Fredrik Viklund
  * fredrik@viklund.se
  */
-
+#include <Arduino.h>
 #include <HardwareSerial.h>
 #include <NIBERegisters.h>
 
@@ -23,13 +23,15 @@ NIBERegisters::VarType NIBERegisters::getParamType(int paramno) {
   if (flag & SIGNED) {
     if (flag & INT) {
       return SINT;
-    } else {
+    }
+    else {
       return SBYTE;
     }
   } else {
     if (flag & INT) {
       return UINT;
-    } else {
+    }
+    else {
       return UBYTE;
     }
   }
@@ -49,7 +51,6 @@ float NIBERegisters::getParamFactor(int paramno) {
 
 int NIBERegisters::storeTg(Telegram tg) {
   int count = 1;
-  float temp;
   msglen = tg[0];
   // Serial.printf("msglen = %d\n", msglen);
   // Serial.printf("String length: %i\n", tgstr.length());
@@ -59,31 +60,39 @@ int NIBERegisters::storeTg(Telegram tg) {
     count += 2;
     paramlen = getParamLen(paramno);
     paramtype = getParamType(paramno);
-    Serial.printf("\nParam %d (%02X), type %d, length %d ", paramno, paramno, paramtype, paramlen);
+    /* Serial.printf("\nParam %d (%02X), type %d, length %d ", paramno, paramno,
+                  paramtype, paramlen); */
     switch (paramtype) {
     case SBYTE:
-      temp = (float)((int8_t)tg[count]) * getParamFactor(paramno);
-      Serial.printf("SBYTE = %.1f", temp);
+      //Serial.print("SBYTE ");
+      paramval = (float)((int8_t)tg[count]) * getParamFactor(paramno);
       count++;
       break;
-
     case UBYTE:
-      temp = (float)tg[count] * getParamFactor(paramno);
-      Serial.printf("UBYTE = %.1f", temp);
+      //Serial.print("UBYTE ");
+      paramval = (float)((uint8_t)tg[count]) * getParamFactor(paramno);
       count++;
       break;
-
     case SINT:
-      temp = (float)(((int16_t)(int8_t)tg[count]) << 8 | (int8_t)tg[count + 1]) * getParamFactor(paramno);
-      Serial.printf("SINT  = %.1f", temp);
+      //Serial.print("SINT ");
+      paramval = (float)((int16_t)tg[count] << 8 | (int16_t)tg[count + 1]) * getParamFactor(paramno);
       count += 2;
       break;
-
     case UINT:
-      temp = (float)((uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1]) * getParamFactor(paramno);
-      Serial.printf("UINT  = %.1f", temp);
+      //Serial.print("UINT ");
+      paramval = (float)((uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1]) * getParamFactor(paramno);
       count += 2;
       break;
+    case BITFIELD:  // TODO 
+      //Serial.print("BITFIELD ");
+      paramval = (uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1];
+      count += 2;
+      break;
+    }
+    if (stored[paramno].value != paramval) {
+      stored[paramno].value = paramval;
+      stored[paramno].lastWrite = millis();
+      Serial.printf("%d = %.1f - stored!\n", paramno, paramval);
     }
   }
   return 0; // TODO - add meaning to return value
