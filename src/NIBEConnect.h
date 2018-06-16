@@ -29,7 +29,7 @@ public:
   int action();
 
 private:
-// TODO - how to add declare functions here without defining them?
+  // TODO - forward declare NIBERegisters and avoid including the .h
   NIBERegisters myHeatpump;
   typedef enum {
     ST_idle,

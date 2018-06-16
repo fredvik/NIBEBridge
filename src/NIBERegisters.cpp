@@ -8,6 +8,11 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include <NIBERegisters.h>
+#include <PubSubClient.h>
+
+extern char mqttMsg[50];
+extern char mqttTopic[50];
+extern PubSubClient mqtt;
 
 // int NIBERegisters::getParamLen(int paramno) {
 int NIBERegisters::getParamLen(int paramno) {
@@ -23,15 +28,13 @@ NIBERegisters::VarType NIBERegisters::getParamType(int paramno) {
   if (flag & SIGNED) {
     if (flag & INT) {
       return SINT;
-    }
-    else {
+    } else {
       return SBYTE;
     }
   } else {
     if (flag & INT) {
       return UINT;
-    }
-    else {
+    } else {
       return UBYTE;
     }
   }
@@ -64,36 +67,49 @@ int NIBERegisters::storeTg(Telegram tg) {
                   paramtype, paramlen); */
     switch (paramtype) {
     case SBYTE:
-      //Serial.print("SBYTE ");
+      // Serial.print("SBYTE ");
       paramval = (float)((int8_t)tg[count]) * getParamFactor(paramno);
       count++;
       break;
     case UBYTE:
-      //Serial.print("UBYTE ");
+      // Serial.print("UBYTE ");
       paramval = (float)((uint8_t)tg[count]) * getParamFactor(paramno);
       count++;
       break;
     case SINT:
-      //Serial.print("SINT ");
-      paramval = (float)((int16_t)tg[count] << 8 | (int16_t)tg[count + 1]) * getParamFactor(paramno);
+      // Serial.print("SINT ");
+      paramval = (float)((int16_t)tg[count] << 8 | (int16_t)tg[count + 1]) *
+                 getParamFactor(paramno);
       count += 2;
       break;
     case UINT:
-      //Serial.print("UINT ");
-      paramval = (float)((uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1]) * getParamFactor(paramno);
+      // Serial.print("UINT ");
+      paramval = (float)((uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1]) *
+                 getParamFactor(paramno);
       count += 2;
       break;
-    case BITFIELD:  // TODO 
-      //Serial.print("BITFIELD ");
+    case BITFIELD: // TODO
+      // Serial.print("BITFIELD ");
       paramval = (uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1];
       count += 2;
       break;
     }
     if (stored[paramno].value != paramval) {
       stored[paramno].value = paramval;
-      stored[paramno].lastWrite = millis();
-      Serial.printf("%d = %.1f - stored!\n", paramno, paramval);
+      stored[paramno].lastChanged = millis();
+
+      snprintf(mqttTopic, 75, "NibeBridge/out/%02d", paramno);
+      snprintf(mqttMsg, 75, "{ \"parameter\" : %2d, \"value\" : %.1f, \"name\" : \"s\" }", paramno, paramval);
+      Serial.printf("Topic: %s, message: %s\n", mqttTopic, mqttMsg);
+      mqtt.publish(mqttTopic, mqttMsg);
+
+    } else if (millis() >
+               stored[paramno].lastPublished + 60000 + random(5000)) {
+      // TODO - replace with PublishInterval, salt with a random delay to avoid
+      // too many bursts
+      stored[paramno].lastPublished = millis();
     }
   }
+
   return 0; // TODO - add meaning to return value
 }

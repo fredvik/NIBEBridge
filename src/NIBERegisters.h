@@ -22,7 +22,7 @@ private:
   typedef enum { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
   struct stored {
     float   value;
-    unsigned long lastWrite;    
+    unsigned long lastChanged, lastPublished;    
   } stored[65]; // TODO - fix dynamic allocation for different models
   
   int16_t paramno, paramtype;

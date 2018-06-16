@@ -12,9 +12,6 @@
  **/
 
 #include <NIBEConnect.h>
-// #include <NIBERegisters.h>   - should be included via NIBEConnect.h
-// #include <SoftwareSerial.h>
-// #include <paraminfo.h>
 
 int NIBEConnect::connect() {
   //  rs485 = connection;
@@ -44,20 +41,16 @@ int NIBEConnect::action() {
     case ST_addressbegun:
       if ((inbyte == 0x14) && (inpar)) {
         if (rs485.available() == 0) { // Only respond if at end of buffer
-          // rs485 queue is empty, don't respond too quickly
+          // rs485 queue is empty, we can respond
           delay(1);
           // TODO - wait slightly without using delay()
-          rs485.write(0x06, NONE);
+          rs485.write(0x06, NONE);  // ACK
           //          Serial.print(inpar ? '*' : ' ');
           //          Serial.printf("%02X", inbyte);
-          //          Serial.printf(" <ACK>");
         }
         currentState = ST_addressed;
       } else {
         // if (inbyte != 0x14) or (no parity) go back to Idle
-        /*        Serial.print(inpar ? '*' : ' ');
-                Serial.printf("%02X", inbyte);
-                Serial.printf(" (not for us)");*/
         currentState = ST_idle;
       }
       break;
@@ -135,11 +128,11 @@ int NIBEConnect::action() {
 
     case ST_checktelegram:
       if (inbyte == chksum) {
-        rs485.write(0x06, NONE);
+        rs485.write(0x06, NONE);  // ACK
         //Serial.printf("Checksum %02X OK, ACK sent\n", chksum);
         myHeatpump.storeTg(rxtg);
       } else {
-        rs485.write(0x15, NONE);
+        rs485.write(0x15, NONE);  // NAK
         Serial.printf("Checksum error! (%02X), NAK sent\n", chksum);
       }
       currentState = ST_idle;
@@ -151,7 +144,8 @@ int NIBEConnect::action() {
       break;
 
     case ST_error:
-      Serial.print("Error: bla blah bla.\n");
+      Serial.print("Unexpected error in state machine. Returning to idle.\n");
+      currentState = ST_idle;
       break;
     } // end of state machine switch
   }
