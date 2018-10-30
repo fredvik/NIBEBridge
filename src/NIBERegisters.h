@@ -30,16 +30,12 @@ private:
   uint8_t msglen, paramlen;
 
 public:
-  // registernummer i NIBEs lista startar på 1 men adresseras med start på 0,
-  // dvs för register 1 skickar man adress 0 på modbus
-  // Parameter 4 = frånluftstemperatur = modbus reg nr 5
   int storeTg(Telegram tg);
   int setRegister();
   int getRegister();
   int getParamLen(int paramno);
   float getParamFactor(int paramno);
   VarType getParamType(int paramno);
-
 };
 
 #endif

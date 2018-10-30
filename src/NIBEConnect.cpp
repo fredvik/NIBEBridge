@@ -18,7 +18,7 @@ int NIBEConnect::connect() {
   return 0;
 }
 
-int NIBEConnect::action() {
+int NIBEConnect::loop() {
   // Parse data from the NIBE
   int queue = rs485.available();
 
@@ -28,8 +28,6 @@ int NIBEConnect::action() {
 
     switch (currentState) {
     case ST_idle:
-      // TODO - remove the line below
-      rxstr = "";
       if ((inbyte == 0x00) && (inpar)) {
         //        Serial.printf("\n%lu ", millis());
         currentState = ST_addressbegun;
@@ -40,9 +38,10 @@ int NIBEConnect::action() {
 
     case ST_addressbegun:
       if ((inbyte == 0x14) && (inpar)) {
-        if (rs485.available() == 0) { // Only respond if at end of buffer
+        if (rs485.available() == 0) {
           // rs485 queue is empty, we can respond
           delay(1);
+          // TODO - check if delay is really needed?
           // TODO - wait slightly without using delay()
           rs485.write(0x06, NONE);  // ACK
           //          Serial.print(inpar ? '*' : ' ');
@@ -50,7 +49,7 @@ int NIBEConnect::action() {
         }
         currentState = ST_addressed;
       } else {
-        // if (inbyte != 0x14) or (no parity) go back to Idle
+        // not addressed to us, go back to Idle
         currentState = ST_idle;
       }
       break;
@@ -96,12 +95,11 @@ int NIBEConnect::action() {
     case ST_getlength:
       if ((inbyte != 0x00) && (inpar == 0)) {
         msglen = inbyte;
+        // TODO - check if length > tgLen, then log error and go to Idle
         chksum ^= inbyte;
         bytecount = 0;
         rxtg[0] = inbyte;  // length of telegram stored in first byte
-        //        rxstr.concat((unsigned char)inbyte);
         bytecount++;
-        rxstr = "";
         //        Serial.print(inpar ? '*' : ' ');
         //        Serial.printf("%02X \n", inbyte);
         //        Serial.printf("(l = %d) ", msglen);
@@ -115,9 +113,7 @@ int NIBEConnect::action() {
 
     case ST_gettelegram:
       chksum ^= inbyte;
-      // TODO - use only String, not array - and just one of them:
       rxtg[bytecount] = inbyte;
-      //          rxstr.concat((unsigned char)inbyte);
       // Serial.print(inpar ? '*' : ' ');
       // Serial.printf("%02X ", inbyte);
       bytecount++;
@@ -129,22 +125,12 @@ int NIBEConnect::action() {
     case ST_checktelegram:
       if (inbyte == chksum) {
         rs485.write(0x06, NONE);  // ACK
-        //Serial.printf("Checksum %02X OK, ACK sent\n", chksum);
+        //Serial.printf("Checksum OK (%02X), ACK sent\n", chksum);
         myHeatpump.storeTg(rxtg);
       } else {
         rs485.write(0x15, NONE);  // NAK
         Serial.printf("Checksum error! (%02X), NAK sent\n", chksum);
       }
-      currentState = ST_idle;
-      break;
-
-    case ST_endoftelegram:
-      Serial.print("\n");
-      currentState = ST_idle;
-      break;
-
-    case ST_error:
-      Serial.print("Unexpected error in state machine. Returning to idle.\n");
       currentState = ST_idle;
       break;
     } // end of state machine switch

@@ -37,16 +37,19 @@ const char* mqtt_server = "192.168.1.5";
 WiFiClient espClient;
 PubSubClient mqtt(espClient);
 long lastMsg = 0;
-char mqttMsg[75];
-char mqttTopic[75];
+const int mqttMsgLen = 75;
+const int mqttTopicLen = 75;
+char mqttMsg[mqttMsgLen];
+char mqttTopic[mqttTopicLen];
 int value = 0;
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
-  for (int i = 0; i < length; i++) {
+  for (unsigned int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
+    // TODO - replace with code to decode and send payload over RS485
   }
   Serial.println();
 
@@ -141,7 +144,7 @@ void setup() {
   });
   ArduinoOTA.begin();
   syslog.logf(LOG_INFO, "NibeBridge starting on IP address %s", WiFi.localIP().toString().c_str());
-  syslog.logf(LOG_DEBUG, "Free sketch space: %u", ESP.getFreeSketchSpace());
+  syslog.logf(LOG_INFO, "Free sketch space: %u", ESP.getFreeSketchSpace());
 
   // Setup NIBE protocol parsing state machine
 
@@ -152,41 +155,26 @@ void setup() {
 }
 
 void loop() {
-
-  unsigned long millisNow = millis();
   ArduinoOTA.handle();
 
   // TODO - make blinks useful info, e.g. connected or not.
+  unsigned long millisNow = millis();
   if (millisNow - lastblinktime >= blinkinterval) {
     lastblinktime = millis();
     ledState = HIGH - ledState; // toggle the LED
     digitalWrite(LED_BUILTIN, ledState);
     if (counter < 1) {
-      // softSerial.printf("Softserial port iteration %d\n", counter);
-      // Serial.printf("Serial port iteration %d\n", counter);
-      Serial.print("Serial connection at your service\n");
+      Serial.print("Serial connection open. At your service\n");
       counter++;
     }
-
   }
-  nibe.action();
+
+  nibe.loop();
 
   if (!mqtt.connected()) {
     mqttReconnect();
   }
+
   mqtt.loop();
-
-  // syslog.logf(LOG_ERR,  "This is error message no. %d", counter);
-  // syslog.logf(LOG_INFO, "This is info message no. %d", counter);
-
-  // Test MQTT connection by sending pings every 5 seconds
-  /* long now = millis();
-  if (now - lastMsg > 5000) {
-    lastMsg = now;
-    snprintf (mqttMsg, 75, "Hello world #%ld");
-    Serial.print("Publishing message: ");
-    Serial.println(mqttMsg);
-    mqtt.publish("outTopic", mqttMsg);
-  }*/
 
 }

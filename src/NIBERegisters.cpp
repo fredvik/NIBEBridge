@@ -97,16 +97,18 @@ int NIBERegisters::storeTg(Telegram tg) {
     if (stored[paramno].value != paramval) {
       stored[paramno].value = paramval;
       stored[paramno].lastChanged = millis();
-
+      // TODO - replace 75 with const
       snprintf(mqttTopic, 75, "NibeBridge/out/%02d", paramno);
       snprintf(mqttMsg, 75, "{ \"parameter\" : %2d, \"value\" : %.1f, \"name\" : \"s\" }", paramno, paramval);
-      Serial.printf("Topic: %s, message: %s\n", mqttTopic, mqttMsg);
+      
+      //Serial.printf("Topic: %s, message: %s\n", mqttTopic, mqttMsg);
       mqtt.publish(mqttTopic, mqttMsg);
 
     } else if (millis() >
-               stored[paramno].lastPublished + 60000 + random(5000)) {
-      // TODO - replace with PublishInterval, salt with a random delay to avoid
+               stored[paramno].lastPublished + 5*60*1000 - random(15000)) {
+      // TODO - #define as republishInterval, salt with a random delay (%) to avoid
       // too many bursts
+      mqtt.publish(mqttTopic, mqttMsg);
       stored[paramno].lastPublished = millis();
     }
   }

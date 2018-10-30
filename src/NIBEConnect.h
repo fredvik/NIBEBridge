@@ -22,14 +22,13 @@ class NIBEConnect {
   typedef void (*pStateFunc)();
 
 public:
-  SoftwareSerial &rs485;
   NIBEConnect(SoftwareSerial &connection) : rs485(connection) {}
-  // Is the destructor needed or useful?
   int connect();
-  int action();
+  int loop();
 
 private:
   // TODO - forward declare NIBERegisters and avoid including the .h
+  SoftwareSerial &rs485;
   NIBERegisters myHeatpump;
   typedef enum {
     ST_idle,
@@ -39,9 +38,7 @@ private:
     ST_getsender,
     ST_getlength,
     ST_gettelegram,
-    ST_checktelegram,
-    ST_endoftelegram,
-    ST_error
+    ST_checktelegram
   } ProtoStates;
 
   ProtoStates currentState = ST_idle;
@@ -49,7 +46,7 @@ private:
   uint8_t inbyte, inpar, chksum, msglen, bytecount, paramlen;
   int16_t paramno, paramval, paramtype;
 
-  typedef char Telegram[30];  // TODO fix char type to uint8_t
+  typedef char Telegram[30];  // Empirical value for Nibe 360P
   Telegram rxtg, txtg; // telegrams received and for transmission
   String rxstr;
 };
