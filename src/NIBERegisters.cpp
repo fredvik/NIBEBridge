@@ -68,7 +68,7 @@ int NIBERegisters::storeTg(Telegram tg) {
     switch (paramtype) {
     case SBYTE:
       // Serial.print("SBYTE ");
-      paramval = (float)((int8_t)tg[count]) * getParamFactor(paramno);
+      paramval = (float)(int8_t)((uint8_t)tg[count]) * getParamFactor(paramno);
       count++;
       break;
     case UBYTE:
@@ -78,7 +78,7 @@ int NIBERegisters::storeTg(Telegram tg) {
       break;
     case SINT:
       // Serial.print("SINT ");
-      paramval = (float)((int16_t)tg[count] << 8 | (int16_t)tg[count + 1]) *
+      paramval = (float)(int16_t)((uint16_t)tg[count] << 8 | (uint16_t)tg[count + 1]) *
                  getParamFactor(paramno);
       count += 2;
       break;
@@ -99,15 +99,17 @@ int NIBERegisters::storeTg(Telegram tg) {
       stored[paramno].lastChanged = millis();
       // TODO - replace 75 with const
       snprintf(mqttTopic, 75, "NibeBridge/out/%02d", paramno);
-      snprintf(mqttMsg, 75, "{ \"parameter\" : %2d, \"value\" : %.1f, \"name\" : \"s\" }", paramno, paramval);
-      
-      //Serial.printf("Topic: %s, message: %s\n", mqttTopic, mqttMsg);
+      snprintf(mqttMsg, 75,
+               "{ \"parameter\" : %2d, \"value\" : %.1f, \"name\" : \"s\" }",
+               paramno, paramval);
+
+      // Serial.printf("Topic: %s, message: %s\n", mqttTopic, mqttMsg);
       mqtt.publish(mqttTopic, mqttMsg);
 
     } else if (millis() >
-               stored[paramno].lastPublished + 5*60*1000 - random(15000)) {
-      // TODO - #define as republishInterval, salt with a random delay (%) to avoid
-      // too many bursts
+               stored[paramno].lastPublished + 5 * 60 * 1000 - random(15000)) {
+      // TODO - #define as republishInterval, salt with a random delay (%) to
+      // avoid too many bursts
       mqtt.publish(mqttTopic, mqttMsg);
       stored[paramno].lastPublished = millis();
     }

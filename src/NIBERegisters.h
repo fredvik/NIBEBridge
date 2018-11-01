@@ -18,7 +18,7 @@ typedef enum VarType { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
 
 class NIBERegisters {
 private:
-  typedef char Telegram[30];
+  typedef uint8_t Telegram[30];
   typedef enum { SBYTE, UBYTE, SINT, UINT, BITFIELD } VarType;
   struct stored {
     float   value;

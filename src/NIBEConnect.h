@@ -46,7 +46,7 @@ private:
   uint8_t inbyte, inpar, chksum, msglen, bytecount, paramlen;
   int16_t paramno, paramval, paramtype;
 
-  typedef char Telegram[30];  // Empirical value for Nibe 360P
+  typedef uint8_t Telegram[30];  // Empirical value for Nibe 360P
   Telegram rxtg, txtg; // telegrams received and for transmission
   String rxstr;
 };
