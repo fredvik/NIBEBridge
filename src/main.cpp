@@ -24,7 +24,7 @@ int iteration = 1;
 
 // WiFi configuration
 const char *wifissid = "Eirreann";
-const char *wifipasswd = "nightcap";
+const char *wifipasswd = "********";
 
 // Softserial configuration
 SoftwareSerial softSerial(12, 14); // RX, Dx = D6, D5
