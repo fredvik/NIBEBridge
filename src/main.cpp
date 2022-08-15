@@ -23,7 +23,7 @@ Syslog syslog(udpClient, SYSLOG_SERVER, SYSLOG_PORT, DEVICE_HOSTNAME, APP_NAME, 
 int iteration = 1;
 
 // WiFi configuration
-const char *wifissid = "Eirreann";
+const char *wifissid = ""********";
 const char *wifipasswd = "********";
 
 // Softserial configuration
